@@ -35,11 +35,11 @@ class Pdu:
         else:
             self.msg_type = RRCLTE.EUTRA_RRC_Definitions.DL_DCCH_Message
 
-    def decode(self, decodeNAS=False):
+    def decode(self, decodeNAS=False, fuzz=False, row=0, new_val=0):
         self.msg_type.from_uper(self.pdu)
         self.pdu_dict = self.msg_type()
         self.nas = []
-        self.parse_dict(0, 0, self.nas, initial_dict=self.pdu_dict, print_info=True)
+        self.parse_dict(0, 0, self.nas, initial_dict=self.pdu_dict, print_info=True, fuzz=fuzz, row=row, content=new_val)
 
         self.debug_extra()
 
@@ -52,21 +52,21 @@ class Pdu:
             for e in self.nas:
                 self.decode_nas(e, self.is_sdu)
 
-    def encode(self, asHexString=True):
+    def encode(self, asHexString=False):
         if asHexString:
             return self.msg_type.to_uper(self.pdu_dict).hex()
         else:
             return self.msg_type.to_uper(self.pdu_dict)
 
     # Utilities
-    def parse_dict(self, container, container_key, nas_info_list, index=0, initial_dict={}, print_info=True):
-        # type: (Pdu, object, object, list, int, dict, bool) -> object
+    def parse_dict(self, container, container_key, nas_info_list, index=0, initial_dict={}, print_info=True, fuzz=False, row=0, content=0):
+        # type: (Pdu, object, object, list, int, dict, bool, bool, int, object) -> object
         if initial_dict == {}:
             initial_dict = container[container_key]
         for key in initial_dict:
             if print_info:
                 print(index * self.sep_char + "KEY " + key, end=' ')
-            self.recursor(initial_dict, key,  nas_info_list, index, print_info=print_info)
+            self.recursor(initial_dict, key,  nas_info_list, index, print_info=print_info, fuzz=fuzz, row=row, content=content)
             if key == "dedicatedInfoNAS":
                 nas_info_list.append(initial_dict[key])
             elif key == "dedicatedInfoType":
@@ -79,32 +79,39 @@ class Pdu:
                     #initial_dict[key] += 1
         return
 
-    def parse_tuple(self, container, container_key, nas_info_list, index=0, print_info=True):
-        # type: (object, object, list, int, bool) -> object
+    def parse_tuple(self, container, container_key, nas_info_list, index=0, print_info=True, fuzz=False, row=0, content=0):
+        # type: (object, object, list, int, bool,  bool, int, object) -> object
         for i in range(0, len(container[container_key])):
             if print_info:
                 print(index * self.sep_char, end='')
-            self.recursor(container[container_key], i, nas_info_list, index, print_info=print_info)
+            self.recursor(container[container_key], i, nas_info_list, index, print_info=print_info, fuzz=fuzz, row=row, content=content)
             #if str.upper(type(container[container_key][i]).__name__) == "INT":
                 #if(container[container_key][i] == 6):
                     #new_tuple = container[container_key][:i] + (container[container_key][i] + 1,) + container[container_key][i+1:]
                     #container[container_key] = new_tuple
         return
 
-    def recursor(self, container, container_key, nas_info_list, index, print_info=True):
+    def recursor(self, container, container_key, nas_info_list, index, print_info=True, fuzz=False, row=0, content=0):
         if print_info:
-            print(str.upper(type(container[container_key]).__name__), end=' ')
+            elem_type = str.upper(type(container[container_key]).__name__)
+            print(elem_type, end=' ')
         if isinstance(container[container_key], dict):
             if print_info:
                 print("")
-            self.parse_dict(container, container_key, nas_info_list, index + 1, print_info=print_info)
+            self.parse_dict(container, container_key, nas_info_list, index + 1, print_info=print_info, fuzz=fuzz, row=row, content=content)
         elif isinstance(container[container_key], tuple) or isinstance(container[container_key], list):
             if print_info:
                 print("")
-            self.parse_tuple(container, container_key, nas_info_list, index + 1, print_info=print_info)
+            self.parse_tuple(container, container_key, nas_info_list, index + 1, print_info=print_info, fuzz=fuzz, row=row, content=content)
         else:
             if print_info:
-                print(container[container_key], "(", self.counter, ")")
+                if elem_type == "BYTES":
+                    print(container[container_key].hex(), "(", self.counter, ")")
+                else:
+                    print(container[container_key], "(", self.counter, ")")
+            if fuzz and row == self.counter:
+                print("FUZZED")
+                container[container_key] = content
             self.counter += 1
         return
 
