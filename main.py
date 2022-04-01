@@ -1,5 +1,12 @@
-import zmq
-from const import *
+
+from const          import *
+from ue_run         import Ue_Run
+from msg_fuzz       import Msg_Fuzz
+from shell_runner   import Shell_Runner
+import time
+import subprocess
+import threading
+
 
 # Do not print runtime warnings on screen
 ASN1Obj._SILENT = False
@@ -15,63 +22,83 @@ ASN1CodecPER.GET_DEFVAL = True
 ASN1CodecPER.CANONICAL = True
 
 
-message_to_fuzz = 0
-message_send = b'\x12\x13\x14'*15  # Trigger RRC conn Reconfiguration complete
-message_send = b'\xff\xff\xff'*15
-message_entry = 5
-message_content = 2
-
-def zmq_reply():
-    context = zmq.Context()
-    socket = context.socket(zmq.REP)
-    socket.bind("tcp://127.0.0.1:5555")
-    ul_messages = 0
-    dl_messages = 0
-    try:
-        while True:
-            message = socket.recv()
-
-            if message[0] == 1:
-                pdu = Pdu(message[1:], True, ul_messages)
-                print("[ UL Message", ul_messages, "received SDU", message[1:].hex(), "]\n")
-                if ul_messages == message_to_fuzz:
-                    if message_send != 0:
-                        pdu.decode(decodeNAS=True)
-                        print("Sending bytes", message_send)
-                        socket.send(message_send)
-                    elif message_entry != -1:
-                        pdu.decode(decodeNAS=True, fuzz=True, row=message_entry, new_val=message_content)
-                        pdu_send = pdu.encode()
-                        print("Sending encoded", pdu_send)
-                        socket.send(pdu_send)
-                else:
-                    pdu.decode(decodeNAS=True)
-                    print("Sending original", pdu.pdu)
-                    socket.send(pdu.pdu)
-                ul_messages += 1
-
-            else:
-                pdu = Pdu(message[1:], False, dl_messages)
-                print("[ DL Message", dl_messages, "received PDU", message[1:].hex(), "]\n")
-                dl_messages += 1
-                pdu.decode(decodeNAS=True)
-                # Useless to send a message
-                socket.send(b'\x12')
-
-            print("\n")
-            print("+-" * 45, "\n\n")
-
-    except KeyboardInterrupt:
-        socket.close()
-    except Exception as error:
-        print("ERROR: {}".format(error))
-        socket.close()
-    socket.close()
 
 
+def fuzzer():
+
+    run_index = 0
+    imsi = 15000
+    # imsi = 23456789123456
+
+    msg_fuzz = {}
+    #msg_fuzz = {0: Msg_Fuzz(0, msg_val=b'\x10')}
+    # msg_fuzz = {0: Msg_Fuzz(0, msg_entry=5, new_val=5)}
 
 
+    print(FZ_PREFIX, "-" * 40, "Run", run_index, "with IMSI", imsi, "-" * 40)
+    print(FZ_PREFIX, "Launching eNB/UE with imsi =", imsi, 'and message to fuzz =', msg_fuzz)
+    # It's possible to:
+    #  - Fuzz a specific message changing bytes
+    #  - Fuzz a specific field of a specific message (even multiple ones)
+    #  - Iterate through all possible values of all possible fields
+
+    print("ACTIVE threads:",threading.active_count())
+    ue_run = Ue_Run(imsi, msg_fuzz=msg_fuzz)
+    ue_run.run()
+
+    print("Sleeping")
+    print("ACTIVE threads:", threading.active_count())
+    time.sleep(15)
+    print("ACTIVE threads:", threading.active_count())
+
+    print(FZ_PREFIX, "-" * 100)
+    print("\n\n\n\n\n")
+
+    imsi = 23456789123456
+    run_index += 1
+
+    print(FZ_PREFIX, "-" * 40, "Run", run_index, "with IMSI", imsi, "-" * 40)
+    print(FZ_PREFIX, "Launching eNB/UE with imsi =", imsi, 'and message to fuzz =', msg_fuzz)
+    # It's possible to:
+    #  - Fuzz a specific message changing bytes
+    #  - Fuzz a specific field of a specific message (even multiple ones)
+    #  - Iterate through all possible values of all possible fields
+
+    ue_run2 = Ue_Run(imsi, msg_fuzz=msg_fuzz)
+    ue_run2.run()
+
+    time.sleep(SHELL_RUN_DELAY)
+    print(FZ_PREFIX, "-" * 100)
+    print("\n\n\n\n\n")
+
+def create_net_ns():
+    print(FZ_PREFIX, "Deleting Network namespace \"ue1\"")
+    del_net_ns = subprocess.call(["sudo", "-E", "ip", "netns", "delete", "ue1"],
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT,
+                                 universal_newlines=True)
+    print(FZ_PREFIX, "Output of deletition:", del_net_ns)
+
+    print(FZ_PREFIX, "Creating Network namespace \"ue1\"")
+    add_net_ns = subprocess.call(["sudo", "-E", "ip", "netns", "add", "ue1"],
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT,
+                                 universal_newlines=True)
+    print(FZ_PREFIX, "Output of addition:", add_net_ns)
+
+
+def delete_existing_srs():
+    print(FZ_PREFIX, "Killing existing instances of srsRAN (if they exists)...")
+    kill_srs = subprocess.call("sudo ps aux | grep srs | awk '{print $2}' | xargs sudo kill -SIGTERM".split(),
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT,
+                               universal_newlines=True)
+    print(FZ_PREFIX, "Output of Kill:", kill_srs)
 
 if __name__ == '__main__':
-    #decode_DL_RRC(pdu1)
-    zmq_reply()
+
+    if CN_LAUNCH:
+        print(FZ_PREFIX, "Create Network NS...")
+        create_net_ns()
+        delete_existing_srs()
+    fuzzer()

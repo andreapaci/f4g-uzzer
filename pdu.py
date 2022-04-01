@@ -18,6 +18,8 @@ class Pdu:
         self.pdu = _pdu
         # The Packet Data Unit (as struct)
         self.pdu_dict = 0
+        # Decoded message as String
+        self.decoded_msg = ""
         # True if is UE -> eNB (uplink)
         self.is_sdu = _is_sdu
         # Number of the message (starting from 0)
@@ -40,6 +42,8 @@ class Pdu:
         self.pdu_dict = self.msg_type()
         self.nas = []
         self.parse_dict(0, 0, self.nas, initial_dict=self.pdu_dict, print_info=True, fuzz=fuzz, row=row, content=new_val)
+        self.decoded_msg += '\n'
+        print(self.decoded_msg)
 
         self.debug_extra()
 
@@ -65,7 +69,8 @@ class Pdu:
             initial_dict = container[container_key]
         for key in initial_dict:
             if print_info:
-                print(index * self.sep_char + "KEY " + key, end=' ')
+                # print(index * self.sep_char + "KEY " + key, end=' ')
+                self.decoded_msg += str(index * self.sep_char) + "KEY " + str(key) + ' '
             self.recursor(initial_dict, key,  nas_info_list, index, print_info=print_info, fuzz=fuzz, row=row, content=content)
             if key == "dedicatedInfoNAS":
                 nas_info_list.append(initial_dict[key])
@@ -74,41 +79,43 @@ class Pdu:
             elif key == "dedicatedInfoNASList":
                 for e in initial_dict[key]:
                     nas_info_list.append(e)
-            #if str.upper(type(initial_dict[key]).__name__) == "INT":
-                #if(initial_dict[key] == 6):
-                    #initial_dict[key] += 1
+
         return
 
     def parse_tuple(self, container, container_key, nas_info_list, index=0, print_info=True, fuzz=False, row=0, content=0):
         # type: (object, object, list, int, bool,  bool, int, object) -> object
-        for i in range(0, len(container[container_key])):
+        for j in range(0, len(container[container_key])):
             if print_info:
-                print(index * self.sep_char, end='')
-            self.recursor(container[container_key], i, nas_info_list, index, print_info=print_info, fuzz=fuzz, row=row, content=content)
-            #if str.upper(type(container[container_key][i]).__name__) == "INT":
-                #if(container[container_key][i] == 6):
-                    #new_tuple = container[container_key][:i] + (container[container_key][i] + 1,) + container[container_key][i+1:]
-                    #container[container_key] = new_tuple
+                # print(index * self.sep_char, end='')
+                self.decoded_msg += str(index * self.sep_char)
+            self.recursor(container[container_key], j, nas_info_list, index, print_info=print_info, fuzz=fuzz, row=row, content=content)
+
         return
+
 
     def recursor(self, container, container_key, nas_info_list, index, print_info=True, fuzz=False, row=0, content=0):
         if print_info:
             elem_type = str.upper(type(container[container_key]).__name__)
-            print(elem_type, end=' ')
+            # print(elem_type, end=' ')
+            self.decoded_msg += elem_type + ' '
         if isinstance(container[container_key], dict):
             if print_info:
-                print("")
+                # print("")
+                self.decoded_msg += '\n'
             self.parse_dict(container, container_key, nas_info_list, index + 1, print_info=print_info, fuzz=fuzz, row=row, content=content)
         elif isinstance(container[container_key], tuple) or isinstance(container[container_key], list):
             if print_info:
-                print("")
+                # print("")
+                self.decoded_msg += '\n'
             self.parse_tuple(container, container_key, nas_info_list, index + 1, print_info=print_info, fuzz=fuzz, row=row, content=content)
         else:
             if print_info:
                 if elem_type == "BYTES":
-                    print(container[container_key].hex(), "(", self.counter, ")")
+                    # print(container[container_key].hex(), "(", self.counter, ")")
+                    self.decoded_msg += container[container_key].hex() + "(" + str(self.counter) + ")\n"
                 else:
-                    print(container[container_key], "(", self.counter, ")")
+                    # print(container[container_key], "(", self.counter, ")")
+                    self.decoded_msg += str(container[container_key]) + "(" + str(self.counter) + ")\n"
             if fuzz and row == self.counter:
                 print("FUZZED")
                 container[container_key] = content
@@ -125,16 +132,15 @@ class Pdu:
             m, e = parse_NAS_MT(pdu)
 
         v = m.get_val()
-        t = m.to_json()
+        t = m.to_json() + "\n"
         self.nas_json.append(t)
 
         if const.DEBUG_NAS_PRINT:
             #print("[DEBUG] Provided NAS bytes:", pdu)
             #print("[DEBUG] Nas Val:", m)
-            print("[DEBUG] Json NAS:", str.upper(type(t).__name__), t.replace("\n", "\n\t"))
+            print("[DEBUG] Json NAS:", str.upper(type(t).__name__), t.replace("\n", "\n\t") + "\n")
         if recursive:
             self.parse_nas(t, is_uplink)
-
         if const.CORRECT_NAS_TEST:
             assert (e == 0)
             m.reautomate()
@@ -150,14 +156,14 @@ class Pdu:
         for e in j[keys[0]]:
             inner_keys = list(e.keys())
             if inner_keys == ["NASMessage"]:
-                if const.DEBUG_NAS_PRINT:
-                    print("\nInner NAS Message:\n")
+                print("\nInner NAS Message:")
                 self.decode_nas(unhexlify(e["NASMessage"]), is_uplink, False)
         if const.CORRECT_NAS_TEST:
             assert (keys == ["EMMSecProtNASMessage"] or
                     keys == ["EMMIdentityRequest"] or
                     keys == ["EMMAuthenticationRequest"] or
                     keys == ["EMMAuthenticationResponse"] or
+                    keys == ["EMMAttachRequest"] or
                     keys == ["EMMIdentityResponse"])
 
     def debug_extra(self):
@@ -171,7 +177,7 @@ class Pdu:
             ret = self.msg_type.to_uper()
             assert (ret == self.pdu)
 
-        if const.WS_TEST:
+        if const.CORRECT_WS_TEST:
             val = self.msg_type()
             self.msg_type.from_uper_ws(self.pdu)
             val_ws = self.msg_type()
