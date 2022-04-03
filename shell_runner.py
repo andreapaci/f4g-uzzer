@@ -9,7 +9,10 @@ import signal
 import unicodedata
 
 
-# Defines a Runner for a Shell Program (In this case the Core/eNB/UE
+# Defines a Runner for a Shell Program (In this case the Core/eNB/UE)
+import const
+
+
 class Shell_Runner:
 
     def __init__(self, _process_list, _prefix, _fuzz_running, _extra_params=None, _stop_cond=None):
@@ -86,11 +89,16 @@ class Shell_Runner:
 
     def check_process(self):
         start_time = None
+        kill_thread = threading.Thread(target=self.kill_threads)
+        kill_thread.daemon = True
+
         if self.is_cond_time:
             start_time = time.time()
 
 
         while not self.is_terminated:
+            #if not self.is_cond_time and self.prefix == const.UE_PREFIX:
+                #print("A")
             output = self.shell_process.stdout.readline().decode('utf-8', 'ignore')
             # If there's some output
             if output != '':
@@ -108,8 +116,10 @@ class Shell_Runner:
                 #TODO: if elapsed_time >= self.stop_cond.success_timeout:
                 if elapsed_time >= self.stop_cond.fail_timeout:
                     print(self.prefix, "FAIL! Elapsed time expired.")
-                    self.kill_threads()
-                    break
+                    self.is_cond_time = False
+                    start_time = time.time()
+                    kill_thread.start()
+                    # TODO: find a way to print last shell code (calling kill_threads as a thread should do the trick)
 
         print(self.prefix, "Closing STDOUT")
         self.shell_process.stdout.close()
@@ -120,15 +130,19 @@ class Shell_Runner:
             print("ACTIVE threads:", threading.active_count())
 
             print(self.prefix, "Killing threads...")
+
+            os.killpg(os.getpgid(self.shell_process.pid), signal.SIGINT)
+            time.sleep(10)
+            self.shell_process.wait()
+            print(self.prefix, "Process killed.")
+
+
             self.is_terminated = True
 
             # Killing fuzzer thread
             self.fuzz_running[0] = False
 
             print(self.prefix, "Fuzzer thread killed")
-
-            os.killpg(os.getpgid(self.shell_process.pid), signal.SIGINT)
-            print(self.prefix, "Process killed.")
 
             # TODO: check se effettivamente vengono stoppati i thread
 

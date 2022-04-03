@@ -2,13 +2,19 @@ from pdu import *
 
 
 # Set to true if it's required to launch the Core Network inside the python fuzzer
+#CN_LAUNCH = False
 CN_LAUNCH = True
 
 # Set to true if it's required to launch the eNB inside the python fuzzer
+#ENB_LAUNCH = False
 ENB_LAUNCH = True
 
 # Set to true if it's required to launch the Core Network inside the python fuzzer
+#UE_LAUNCH = False
 UE_LAUNCH = True
+
+# Set to true if a new context has to be launched
+CTXT_DELETE = True
 
 
 # Text prefix for Core Network, eNB, UE and Fuzzer
@@ -24,11 +30,11 @@ CONFIG_PATH = "/home/andrea/.config/srsran/"
 
 # Paths to UE, ENB and EPC as List (could also have been done with string.split())
 CN_PATH = ['sudo', BUILDS_PATH + 'srsepc/src/srsepc']
-NB_PATH = [BUILDS_PATH + 'srsenb/src/srsenb',  CONFIG_PATH + 'enb.conf', '--rf.device_name=zmq',
+NB_PATH = ['sudo', BUILDS_PATH + 'srsenb/src/srsenb',  CONFIG_PATH + 'enb.conf', '--rf.device_name=zmq',
            '--rf.device_args="fail_on_disconnect=true,tx_port=tcp://*:2000,rx_port=tcp://localhost:2001,id=enb,base_srate=23.04e6"']
 UE_PATH = ['sudo', BUILDS_PATH + 'srsue/src/srsue', CONFIG_PATH + 'ue.conf', '--rf.device_name=zmq',
-             '--rf.device_args="tx_port=tcp://*:2001,rx_port=tcp://localhost:2000,id=ue,base_srate=23.04e6"',
-             '--gw.netns=ue1']
+           '--rf.device_args="tx_port=tcp://*:2001,rx_port=tcp://localhost:2000,id=ue,base_srate=23.04e6"',
+           '--gw.netns=ue1']
 UE_IMSI_PARAM = '--usim.imsi='
 
 # Delay in seconds between the run of EPC, eNB and UE (in this order)

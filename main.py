@@ -42,7 +42,7 @@ def fuzzer():
     #  - Fuzz a specific field of a specific message (even multiple ones)
     #  - Iterate through all possible values of all possible fields
 
-    print("ACTIVE threads:",threading.active_count())
+    print("ACTIVE threads:", threading.active_count())
     ue_run = Ue_Run(imsi, msg_fuzz=msg_fuzz)
     ue_run.run()
 

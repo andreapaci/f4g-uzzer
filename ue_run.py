@@ -37,6 +37,15 @@ class Ue_Run:
         # Boolean variable used to stop the main (fuzzer) thread
         self.is_running = [True]
 
+    # Remove security context file
+    def remove_ctxt(self):
+        print(FZ_PREFIX, "Deleting Security context")
+        del_ctxt = subprocess.call(["sudo", "rm", ".ctxt"],
+                                     stdout=subprocess.PIPE,
+                                     stderr=subprocess.STDOUT,
+                                     universal_newlines=True)
+        print(FZ_PREFIX, "Output of deletition:", del_ctxt)
+
     def run(self):
 
         thread_run = threading.Thread(target=self.run_thread)
@@ -63,6 +72,8 @@ class Ue_Run:
 
         if UE_LAUNCH:
             print(FZ_PREFIX, "Launching UE")
+            if CTXT_DELETE:
+                self.remove_ctxt()
             ue_runner = Shell_Runner(UE_PATH, UE_PREFIX, self.is_running, _extra_params=UE_IMSI_PARAM + self.imsi, _stop_cond=self.ue_cond)
             ue_runner.run()
             print(FZ_PREFIX, "UE Launched.")
