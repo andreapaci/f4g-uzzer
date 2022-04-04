@@ -41,11 +41,13 @@ class Pdu:
         self.msg_type.from_uper(self.pdu)
         self.pdu_dict = self.msg_type()
         self.nas = []
+        # TODO: reimposta il Correct_test e Correct_ws_test a True e metti delf.debug_extra sotto print(self.decoded_mesg) e vedi se fallisce con il Radio link failure
+        self.debug_extra()
+
         self.parse_dict(0, 0, self.nas, initial_dict=self.pdu_dict, print_info=True, fuzz=fuzz, row=row, content=new_val)
         self.decoded_msg += '\n'
         print(self.decoded_msg)
 
-        self.debug_extra()
 
         if len(self.nas) != 0:
             self.has_nas = True
@@ -136,8 +138,6 @@ class Pdu:
         self.nas_json.append(t)
 
         if const.DEBUG_NAS_PRINT:
-            #print("[DEBUG] Provided NAS bytes:", pdu)
-            #print("[DEBUG] Nas Val:", m)
             print("[DEBUG] Json NAS:", str.upper(type(t).__name__), t.replace("\n", "\n\t") + "\n")
         if recursive:
             self.parse_nas(t, is_uplink)
@@ -168,13 +168,15 @@ class Pdu:
 
     def debug_extra(self):
         if const.DEBUG_PDU_PRINT:
-            # NOTE: SEMBRA SCRORRETTO
-            #print("[DEBUG] Provided PDU\n" + hexlify(self.pdu).hex())
             print("[DEBUG] JSON Format\n" + self.msg_type.to_jer())
             print("[DEBUG] Dict print\n", self.msg_type())
 
         if const.CORRECT_TEST:
             ret = self.msg_type.to_uper()
+            #print("OKOKOK", ret.hex())
+            #print("222222", self.pdu.hex())
+            # TODO: in some cases, those two bytes sequence are different even if the decode is the same
+            # TODO: instead of comparing bytes, compare the resulting struct (should be the same)
             assert (ret == self.pdu)
 
         if const.CORRECT_WS_TEST:

@@ -1,5 +1,4 @@
-from pdu import *
-
+from binascii import *
 
 # Set to true if it's required to launch the Core Network inside the python fuzzer
 #CN_LAUNCH = False
@@ -23,6 +22,11 @@ NB_PREFIX = "[eNoB]"
 UE_PREFIX = "[UsEq]"
 FZ_PREFIX = "[Fuzz]"
 
+
+# String to print in case of Success/Failure
+SUCC_TEXT = "Success!"
+FAIL_TEXT = "Failure!"
+
 # Path to build folder of EPC/ENB/UE and configuration files
 BUILDS_PATH = "/home/andrea/Desktop/mysrsran/srsRAN/build/"
 CONFIG_PATH = "/home/andrea/.config/srsran/"
@@ -39,12 +43,15 @@ UE_IMSI_PARAM = '--usim.imsi='
 
 # Delay in seconds between the run of EPC, eNB and UE (in this order)
 SHELL_RUN_DELAY = 3
+# Delay between each RUN
+RUN_DELAY = 5
 
 
 # Values to stop the EPC/ENB/UE running
 
 # When the UE has to stop by default (when it receives this output the run went well)
 DEF_UE_SUCC_TEXT = ["Software Radio Systems RAN (srsRAN)"]
+DEF_UE_FAIL_TEXT = ["Radio-Link Failure"]
 # If the UE doesn't respond for 5 seconds, it means there's a failure
 DEF_UE_FAIL_TIME = 10
 

@@ -1,5 +1,7 @@
 # Class defining a UE run to be fuzzed
 
+import sys
+import traceback
 import zmq
 import datetime
 from pdu import Pdu
@@ -32,6 +34,7 @@ class Ue_Run:
         # Setting the conditions. HARD CODED VALUE, CAN BE CHANGED FOR EACH RUN
         self.ue_cond = Stop_Cond()
         self.ue_cond.success_text = DEF_UE_SUCC_TEXT
+        self.ue_cond.fail_text = DEF_UE_FAIL_TEXT
         self.ue_cond.fail_timeout = DEF_UE_FAIL_TIME
 
         # Boolean variable used to stop the main (fuzzer) thread
@@ -157,8 +160,15 @@ class Ue_Run:
 
         except KeyboardInterrupt:
             print("Keyboard interrupt")
-        except Exception as error:
-            print("ERROR: {}".format(error))
+        except Exception:
+            # TODO: Set a "saving point" that reports this failure (this failure as another failure in Shell_runner (ex. stderr) or even others)
+            _, _, tb = sys.exc_info()
+            traceback.print_tb(tb)  # Fixed format
+            tb_info = traceback.extract_tb(tb)
+            filename, line, func, text = tb_info[-1]
+
+            print('An error occurred on line {} in statement {}'.format(line, text))
+
         finally:
             print(FZ_PREFIX, "Main thread Exited...")
             self.socket.close()

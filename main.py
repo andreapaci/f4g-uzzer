@@ -6,7 +6,9 @@ from shell_runner   import Shell_Runner
 import time
 import subprocess
 import threading
-
+from pycrate_asn1rt.codecs      import _with_json
+from pycrate_asn1rt.asnobj_ext  import *
+from CryptoMobile               import CM
 
 # Do not print runtime warnings on screen
 ASN1Obj._SILENT = False
@@ -31,7 +33,7 @@ def fuzzer():
     # imsi = 23456789123456
 
     msg_fuzz = {}
-    #msg_fuzz = {0: Msg_Fuzz(0, msg_val=b'\x10')}
+    # msg_fuzz = {0: Msg_Fuzz(0, msg_val=b'\x10')} (Trigger RADIO LINK FAILURE)
     # msg_fuzz = {0: Msg_Fuzz(0, msg_entry=5, new_val=5)}
 
 
@@ -48,7 +50,7 @@ def fuzzer():
 
     print("Sleeping")
     print("ACTIVE threads:", threading.active_count())
-    time.sleep(15)
+    time.sleep(RUN_DELAY)
     print("ACTIVE threads:", threading.active_count())
 
     print(FZ_PREFIX, "-" * 100)

@@ -8,7 +8,6 @@ import os
 import signal
 import unicodedata
 
-
 # Defines a Runner for a Shell Program (In this case the Core/eNB/UE)
 import const
 
@@ -107,6 +106,16 @@ class Shell_Runner:
                 # Update the last seen stdout message
                 if self.is_cond_time:
                     start_time = time.time()
+                # Check Success/Failure text
+                if self.is_cond_text:
+                    # Check successful text
+                    for t in self.stop_cond.success_text:
+                        if t.lower() in output.lower():
+                            print(self.prefix, const.SUCC_TEXT, "String \"", t, "\" found.")
+                    # Check failing text
+                    for t in self.stop_cond.fail_text:
+                        if t.lower() in output.lower():
+                            print(self.prefix, const.FAIL_TEXT, "String \"", t, "\" found.")
 
                 # TODO: Evaluating condition of text
 
@@ -115,7 +124,7 @@ class Shell_Runner:
                 elapsed_time = time.time() - start_time
                 #TODO: if elapsed_time >= self.stop_cond.success_timeout:
                 if elapsed_time >= self.stop_cond.fail_timeout:
-                    print(self.prefix, "FAIL! Elapsed time expired.")
+                    print(self.prefix, const.FAIL_TEXT, "Elapsed time expired.")
                     self.is_cond_time = False
                     start_time = time.time()
                     kill_thread.start()
@@ -132,10 +141,8 @@ class Shell_Runner:
             print(self.prefix, "Killing threads...")
 
             os.killpg(os.getpgid(self.shell_process.pid), signal.SIGINT)
-            time.sleep(10)
             self.shell_process.wait()
             print(self.prefix, "Process killed.")
-
 
             self.is_terminated = True
 
