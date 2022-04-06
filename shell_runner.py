@@ -14,7 +14,7 @@ import const
 
 class Shell_Runner:
 
-    def __init__(self, _process_list, _prefix, _fuzz_running, _extra_params=None, _stop_cond=None):
+    def __init__(self, _process_list, _prefix, _fuzz_running, _outcome, _extra_params=None, _stop_cond=None):
 
         # Prefix to be used for printing info
         self.prefix = _prefix
@@ -28,7 +28,7 @@ class Shell_Runner:
             self.shell_cmd_list.append(_extra_params)
 
         print(self.shell_cmd_list)
-        # Reference to the fuzzer thread (has to be stopped)
+        # Condition to stop the fuzzer thread (has to be stopped)
         self.fuzz_running = _fuzz_running
         # If the Shell runner is terminated
         self.is_terminated = False
@@ -49,13 +49,13 @@ class Shell_Runner:
             if len(self.stop_cond.fail_text) > 0 or len(self.stop_cond.success_text) > 0:
                 self.is_cond_text = True
 
-
         # This thread checks the running status of the shell program and choose if the
-        # execution is failing or not (eg. specific output or specific timeout between answers)
+        # execution is failing or not (e.g. specific output or specific timeout between answers)
         self.thread_check = threading.Thread(target=self.check_process)
         self.thread_check.daemon = True
 
-
+        # Variable responsible for reporting the outcome of the Run
+        self.outcome = _outcome
 
 
     def run(self):
@@ -96,8 +96,7 @@ class Shell_Runner:
 
 
         while not self.is_terminated:
-            #if not self.is_cond_time and self.prefix == const.UE_PREFIX:
-                #print("A")
+
             output = self.shell_process.stdout.readline().decode('utf-8', 'ignore')
             # If there's some output
             if output != '':
@@ -112,11 +111,22 @@ class Shell_Runner:
                     for t in self.stop_cond.success_text:
                         if t.lower() in output.lower():
                             print(self.prefix, const.SUCC_TEXT, "String \"", t, "\" found.")
+                            # Set outcome
+                            if len(self.outcome) == 0:
+                                self.outcome[const.OUTCOME_SUCC] = True
+                                self.outcome[const.OUTCOME_TYPE] = const.OUTCOME_TYPE_TEXT
+
+                            kill_thread.start()
                     # Check failing text
                     for t in self.stop_cond.fail_text:
                         if t.lower() in output.lower():
                             print(self.prefix, const.FAIL_TEXT, "String \"", t, "\" found.")
+                            # Set outcome
+                            if len(self.outcome) == 0:
+                                self.outcome[const.OUTCOME_SUCC] = False
+                                self.outcome[const.OUTCOME_TYPE] = const.OUTCOME_TYPE_TEXT
 
+                            kill_thread.start()
                 # TODO: Evaluating condition of text
 
             # If the condition "time" has to be evaluated and the time has expired
@@ -127,6 +137,11 @@ class Shell_Runner:
                     print(self.prefix, const.FAIL_TEXT, "Elapsed time expired.")
                     self.is_cond_time = False
                     start_time = time.time()
+                    # Set outcome
+                    if len(self.outcome) == 0:
+                        self.outcome[const.OUTCOME_SUCC] = False
+                        self.outcome[const.OUTCOME_TYPE] = const.OUTCOME_TYPE_TIME
+
                     kill_thread.start()
                     # TODO: find a way to print last shell code (calling kill_threads as a thread should do the trick)
 

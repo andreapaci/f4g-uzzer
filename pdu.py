@@ -1,10 +1,13 @@
+from const      import *
+from test_cases import *
+
+
 from pycrate_asn1dir            import RRCLTE
 from pycrate_mobile.NAS         import *
-
-import const
 from pycrate_asn1rt.codecs      import _with_json
 from pycrate_asn1rt.asnobj_ext  import *
 from CryptoMobile               import CM
+
 import json
 
 
@@ -37,17 +40,22 @@ class Pdu:
         else:
             self.msg_type = RRCLTE.EUTRA_RRC_Definitions.DL_DCCH_Message
 
-    def decode(self, decodeNAS=False, fuzz=False, row=0, new_val=0):
+    # fuzz indicates if a field has to be changed, fuzz_index means there's a fuzzing procedure (test all fields)
+    def decode(self, decodeNAS=False, fuzz=False, row=0, new_val=0, fuzz_index=None):
         self.msg_type.from_uper(self.pdu)
         self.pdu_dict = self.msg_type()
         self.nas = []
         # TODO: reimposta il Correct_test e Correct_ws_test a True e metti delf.debug_extra sotto print(self.decoded_mesg) e vedi se fallisce con il Radio link failure
         self.debug_extra()
 
-        self.parse_dict(0, 0, self.nas, initial_dict=self.pdu_dict, print_info=True, fuzz=fuzz, row=row, content=new_val)
+        self.parse_dict(0, 0, self.nas, initial_dict=self.pdu_dict, print_info=True, fuzz=fuzz, row=row, content=new_val, fuzz_index=fuzz_index)
         self.decoded_msg += '\n'
         print(self.decoded_msg)
 
+
+        if fuzz_index is not None:
+            if not fuzz_index.has_next_input and self.counter >= fuzz_index.field + 1:
+                fuzz_index.has_next_field = False
 
         if len(self.nas) != 0:
             self.has_nas = True
@@ -59,13 +67,22 @@ class Pdu:
                 self.decode_nas(e, self.is_sdu)
 
     def encode(self, asHexString=False):
-        if asHexString:
-            return self.msg_type.to_uper(self.pdu_dict).hex()
-        else:
-            return self.msg_type.to_uper(self.pdu_dict)
+        try:
+            if asHexString:
+                return self.msg_type.to_uper(self.pdu_dict).hex()
+            else:
+                return self.msg_type.to_uper(self.pdu_dict)
+        except Exception:
+            # NOTE: Raising an exception if the encoding fails is wrong! It would bring a lot of
+            # "False" exception which should not be reported
+            print(FZ_PREFIX, "Could not encode PDU, returning original PDU")
+            if asHexString:
+                return self.pdu.hex()
+            else:
+                return self.pdu
 
     # Utilities
-    def parse_dict(self, container, container_key, nas_info_list, index=0, initial_dict={}, print_info=True, fuzz=False, row=0, content=0):
+    def parse_dict(self, container, container_key, nas_info_list, index=0, initial_dict={}, print_info=True, fuzz=False, row=0, content=0, fuzz_index=None):
         # type: (Pdu, object, object, list, int, dict, bool, bool, int, object) -> object
         if initial_dict == {}:
             initial_dict = container[container_key]
@@ -73,7 +90,7 @@ class Pdu:
             if print_info:
                 # print(index * self.sep_char + "KEY " + key, end=' ')
                 self.decoded_msg += str(index * self.sep_char) + "KEY " + str(key) + ' '
-            self.recursor(initial_dict, key,  nas_info_list, index, print_info=print_info, fuzz=fuzz, row=row, content=content)
+            self.recursor(initial_dict, key,  nas_info_list, index, print_info=print_info, fuzz=fuzz, row=row, content=content, fuzz_index=fuzz_index)
             if key == "dedicatedInfoNAS":
                 nas_info_list.append(initial_dict[key])
             elif key == "dedicatedInfoType":
@@ -84,18 +101,23 @@ class Pdu:
 
         return
 
-    def parse_tuple(self, container, container_key, nas_info_list, index=0, print_info=True, fuzz=False, row=0, content=0):
-        # type: (object, object, list, int, bool,  bool, int, object) -> object
+    def parse_tuple(self, container, container_key, nas_info_list, index=0, print_info=True, fuzz=False, row=0, content=0, fuzz_index=None):
+        # type: (object, object, list, int, bool,  bool, int, object, object) -> object
+
+        # Necessary conversion to enable modification to the tuple
+        container[container_key] = list(container[container_key])
+
         for j in range(0, len(container[container_key])):
             if print_info:
                 # print(index * self.sep_char, end='')
                 self.decoded_msg += str(index * self.sep_char)
-            self.recursor(container[container_key], j, nas_info_list, index, print_info=print_info, fuzz=fuzz, row=row, content=content)
+            self.recursor(container[container_key], j, nas_info_list, index, print_info=print_info, fuzz=fuzz, row=row, content=content, fuzz_index=fuzz_index)
 
+        container[container_key] = tuple(container[container_key])
         return
 
 
-    def recursor(self, container, container_key, nas_info_list, index, print_info=True, fuzz=False, row=0, content=0):
+    def recursor(self, container, container_key, nas_info_list, index, print_info=True, fuzz=False, row=0, content=0, fuzz_index=None):
         if print_info:
             elem_type = str.upper(type(container[container_key]).__name__)
             # print(elem_type, end=' ')
@@ -104,12 +126,12 @@ class Pdu:
             if print_info:
                 # print("")
                 self.decoded_msg += '\n'
-            self.parse_dict(container, container_key, nas_info_list, index + 1, print_info=print_info, fuzz=fuzz, row=row, content=content)
+            self.parse_dict(container, container_key, nas_info_list, index + 1, print_info=print_info, fuzz=fuzz, row=row, content=content, fuzz_index=fuzz_index)
         elif isinstance(container[container_key], tuple) or isinstance(container[container_key], list):
             if print_info:
                 # print("")
                 self.decoded_msg += '\n'
-            self.parse_tuple(container, container_key, nas_info_list, index + 1, print_info=print_info, fuzz=fuzz, row=row, content=content)
+            self.parse_tuple(container, container_key, nas_info_list, index + 1, print_info=print_info, fuzz=fuzz, row=row, content=content, fuzz_index=fuzz_index)
         else:
             if print_info:
                 if elem_type == "BYTES":
@@ -118,37 +140,68 @@ class Pdu:
                 else:
                     # print(container[container_key], "(", self.counter, ")")
                     self.decoded_msg += str(container[container_key]) + "(" + str(self.counter) + ")\n"
+
+            # Change single value (no fuzzing)
             if fuzz and row == self.counter:
-                print("FUZZED")
+                print("CHANGED")
                 container[container_key] = content
+
+            # Fuzz multiple values
+            if fuzz_index is not None:
+                if self.msg_number == fuzz_index.message and self.counter == fuzz_index.field:
+                    print("FUZZED")
+                    # If the element type is not in the defined ones (BYTE, STRING, Ecc..) raise exception and switch to the next field
+                    if elem_type not in TEST_VALUES:
+                        print(FZ_PREFIX, "Unspecified type:", elem_type, "at position", self.counter)
+                        fuzz_index.has_next_input = False
+                        raise Exception("Unspecified type: " + elem_type)
+
+                    # Assign the test values according to the element type
+                    test_values = TEST_VALUES[elem_type]
+
+                    container[container_key] = test_values[fuzz_index.test_input_index]
+                    # If last value to be tested
+                    if fuzz_index.test_input_index >= len(test_values) - 1:
+                        fuzz_index.has_next_input = False
+
             self.counter += 1
+
         return
 
     def decode_nas(self, data, is_uplink, recursive=True):
         pdu = data
         m = 0
         e = 0
-        if is_uplink:
-            m, e = parse_NAS_MO(pdu)
-        else:
-            m, e = parse_NAS_MT(pdu)
+        try:
+            if is_uplink:
+                m, e = parse_NAS_MO(pdu)
+            else:
+                m, e = parse_NAS_MT(pdu)
 
-        v = m.get_val()
-        t = m.to_json() + "\n"
-        self.nas_json.append(t)
+            v = m.get_val()
+            t = m.to_json() + "\n"
+            self.nas_json.append(t)
 
-        if const.DEBUG_NAS_PRINT:
-            print("[DEBUG] Json NAS:", str.upper(type(t).__name__), t.replace("\n", "\n\t") + "\n")
-        if recursive:
-            self.parse_nas(t, is_uplink)
-        if const.CORRECT_NAS_TEST:
-            assert (e == 0)
-            m.reautomate()
-            assert (m.get_val() == v)
-            m.set_val(v)
-            assert (m.to_bytes() == pdu)
-            m.from_json(t)
-            assert (m.get_val() == v)
+            if DEBUG_NAS_PRINT:
+                print("[DEBUG] Json NAS:", str.upper(type(t).__name__), t.replace("\n", "\n\t") + "\n")
+            if recursive:
+                self.parse_nas(t, is_uplink)
+            if CORRECT_NAS_TEST:
+                assert (e == 0)
+                m.reautomate()
+                assert (m.get_val() == v)
+                m.set_val(v)
+                assert (m.to_bytes() == pdu)
+                m.from_json(t)
+                assert (m.get_val() == v)
+        # TODO: Handle Assertion error to raise another exception
+        except AssertionError as error:
+            print("Assertion Error")
+            raise error
+        except Exception:
+            print(FZ_PREFIX, "Could not Decode Nas (Probably modified by fuzzer)")
+
+
 
     def parse_nas(self, t, is_uplink):
         j = json.loads(t)
@@ -158,28 +211,27 @@ class Pdu:
             if inner_keys == ["NASMessage"]:
                 print("\nInner NAS Message:")
                 self.decode_nas(unhexlify(e["NASMessage"]), is_uplink, False)
-        if const.CORRECT_NAS_TEST:
+        if CORRECT_NAS_TEST:
             assert (keys == ["EMMSecProtNASMessage"] or
                     keys == ["EMMIdentityRequest"] or
                     keys == ["EMMAuthenticationRequest"] or
                     keys == ["EMMAuthenticationResponse"] or
                     keys == ["EMMAttachRequest"] or
-                    keys == ["EMMIdentityResponse"])
+                    keys == ["EMMIdentityResponse"] or
+                    keys == ["EMMDetachRequestMO"])
 
     def debug_extra(self):
-        if const.DEBUG_PDU_PRINT:
+        if DEBUG_PDU_PRINT:
             print("[DEBUG] JSON Format\n" + self.msg_type.to_jer())
             print("[DEBUG] Dict print\n", self.msg_type())
 
-        if const.CORRECT_TEST:
+        if CORRECT_TEST:
             ret = self.msg_type.to_uper()
-            #print("OKOKOK", ret.hex())
-            #print("222222", self.pdu.hex())
             # TODO: in some cases, those two bytes sequence are different even if the decode is the same
             # TODO: instead of comparing bytes, compare the resulting struct (should be the same)
             assert (ret == self.pdu)
 
-        if const.CORRECT_WS_TEST:
+        if CORRECT_WS_TEST:
             val = self.msg_type()
             self.msg_type.from_uper_ws(self.pdu)
             val_ws = self.msg_type()

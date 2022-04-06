@@ -1,14 +1,12 @@
-
 from const          import *
 from ue_run         import Ue_Run
-from msg_fuzz       import Msg_Fuzz
-from shell_runner   import Shell_Runner
-import time
-import subprocess
-import threading
-from pycrate_asn1rt.codecs      import _with_json
+from fuzz_index     import *
+from msg_fuzz       import *
+
 from pycrate_asn1rt.asnobj_ext  import *
-from CryptoMobile               import CM
+
+import datetime
+import subprocess
 
 # Do not print runtime warnings on screen
 ASN1Obj._SILENT = False
@@ -26,52 +24,88 @@ ASN1CodecPER.CANONICAL = True
 
 
 
-def fuzzer():
+def run():
+    f = open("report", "a")
+    f.write("\n" + "-" * 15 + " Run started at " + str(datetime.datetime.now().date()) + " " + str(datetime.datetime.now().time())[:8] + " " + "-" * 15 + "\n")
 
-    run_index = 0
+    send_specific_message(f)
+
+    #fuzz(f)
+
+    f.close()
+
+
+def send_specific_message(f):
+
     imsi = 15000
     # imsi = 23456789123456
 
     msg_fuzz = {}
-    # msg_fuzz = {0: Msg_Fuzz(0, msg_val=b'\x10')} (Trigger RADIO LINK FAILURE)
+    # Dict Format {UL_Message_Number: Msg_Fuzz(UL_Message_Number, other fields)
+    # msg_fuzz = {0: Msg_Fuzz(0, msg_val=b'\x10')} # (Trigger RADIO LINK FAILURE)
     # msg_fuzz = {0: Msg_Fuzz(0, msg_entry=5, new_val=5)}
+    msg_fuzz = {1: Msg_Fuzz(1, msg_entry=5, new_val=b'\x12\x34')}  # Test Tuple ( CRASH CORE NETWORK )
 
+    outcome = {}
 
-    print(FZ_PREFIX, "-" * 40, "Run", run_index, "with IMSI", imsi, "-" * 40)
+    print(FZ_PREFIX, "-" * 40, "Run with IMSI", imsi, "-" * 40)
     print(FZ_PREFIX, "Launching eNB/UE with imsi =", imsi, 'and message to fuzz =', msg_fuzz)
     # It's possible to:
     #  - Fuzz a specific message changing bytes
     #  - Fuzz a specific field of a specific message (even multiple ones)
     #  - Iterate through all possible values of all possible fields
 
-    print("ACTIVE threads:", threading.active_count())
-    ue_run = Ue_Run(imsi, msg_fuzz=msg_fuzz)
+    ue_run = Ue_Run(imsi, outcome, msg_fuzz=msg_fuzz)
     ue_run.run()
 
-    print("Sleeping")
-    print("ACTIVE threads:", threading.active_count())
-    time.sleep(RUN_DELAY)
-    print("ACTIVE threads:", threading.active_count())
+    print(outcome)
 
     print(FZ_PREFIX, "-" * 100)
     print("\n\n\n\n\n")
 
-    imsi = 23456789123456
-    run_index += 1
+    if not outcome[OUTCOME_SUCC]:
+        # TODO: print msg_fuzz info in outcome
+        f.write(str(outcome) + "\n")
 
-    print(FZ_PREFIX, "-" * 40, "Run", run_index, "with IMSI", imsi, "-" * 40)
-    print(FZ_PREFIX, "Launching eNB/UE with imsi =", imsi, 'and message to fuzz =', msg_fuzz)
-    # It's possible to:
-    #  - Fuzz a specific message changing bytes
-    #  - Fuzz a specific field of a specific message (even multiple ones)
-    #  - Iterate through all possible values of all possible fields
 
-    ue_run2 = Ue_Run(imsi, msg_fuzz=msg_fuzz)
-    ue_run2.run()
+# It's possible to:
+#  - Fuzz a specific message changing bytes
+#  - Fuzz a specific field of a specific message (even multiple ones)
+#  - Iterate through all possible values of all possible fields
+def fuzz(f):
+    # Starting IMSI
+    imsi = 15
+    index = Fuzz_Index()
 
-    time.sleep(SHELL_RUN_DELAY)
-    print(FZ_PREFIX, "-" * 100)
-    print("\n\n\n\n\n")
+    # Messages to be tested
+    while index.message < 2:
+        print(FZ_PREFIX, "-" * 40, "Run with IMSI", imsi, "-" * 40)
+        print(FZ_PREFIX, "Launching eNB/UE with imsi =", imsi, 'and message to fuzz =')
+
+        outcome = {}
+
+        ue_run = Ue_Run(imsi, outcome)
+        ue_run.run()
+
+        print(outcome)
+
+        print(FZ_PREFIX, "-" * 100)
+        print("\n\n\n\n\n")
+
+        if OUTCOME_SUCC in outcome:
+            if not outcome[OUTCOME_SUCC]:
+                f.write("message: " + index.message + ", field: " + index.field +
+                        ", test_index: " + index.test_input_index, + " " + str(outcome) + "\n")
+        else:
+            f.write("This run sent non registered Exception")
+
+        # Prepare next iteration
+        imsi += 1
+        index.next()
+
+
+# --------------------------------------------- Utilities functions --------------------------------------------- #
+
 
 def create_net_ns():
     print(FZ_PREFIX, "Deleting Network namespace \"ue1\"")
@@ -97,10 +131,13 @@ def delete_existing_srs():
                                universal_newlines=True)
     print(FZ_PREFIX, "Output of Kill:", kill_srs)
 
+
 if __name__ == '__main__':
 
     if CN_LAUNCH:
         print(FZ_PREFIX, "Create Network NS...")
         create_net_ns()
         delete_existing_srs()
-    fuzzer()
+    run()
+
+

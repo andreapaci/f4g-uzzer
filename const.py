@@ -47,12 +47,22 @@ SHELL_RUN_DELAY = 3
 RUN_DELAY = 5
 
 
+# Outcome dictonary Keys
+OUTCOME_SUCC = 'successful'
+OUTCOME_TYPE = 'type'
+# The element defined by the key 'type' can be one of this
+OUTCOME_TYPE_TIME = 'time'
+OUTCOME_TYPE_TEXT = 'text'
+OUTCOME_TYPE_EXCE = 'exception'
+OUTCOME_TYPE_INTE = 'keyboard_interrupt'
+
+
 # Values to stop the EPC/ENB/UE running
 
 # When the UE has to stop by default (when it receives this output the run went well)
 DEF_UE_SUCC_TEXT = ["Software Radio Systems RAN (srsRAN)"]
-DEF_UE_FAIL_TEXT = ["Radio-Link Failure"]
-# If the UE doesn't respond for 5 seconds, it means there's a failure
+DEF_UE_FAIL_TEXT = ["Radio-Link Failure"]  # Forse anche "Attach failed"
+# If the UE doesn't respond for 'x' seconds, it means there's a failure
 DEF_UE_FAIL_TIME = 10
 
 # ------------------------------------------------------------------------------------
