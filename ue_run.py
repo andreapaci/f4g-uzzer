@@ -120,7 +120,7 @@ class Ue_Run:
                     print(FZ_PREFIX, "[ UL Message", self.ul_messages, "received SDU", message[1:].hex(), "]\n")
 
                     # If message has to be changed (no fuzzing, just a specific message)
-                    if self.ul_messages in self.msg_fuzz:
+                    if self.msg_fuzz is not None and self.ul_messages in self.msg_fuzz:
 
                         # If the message to fuzz is byte only (no field parsing)
                         if self.msg_fuzz[self.ul_messages].is_byte:
@@ -131,26 +131,35 @@ class Ue_Run:
 
                         # If a specific field has to be fuzzed
                         else:
+
                             pdu.decode(decodeNAS=True, fuzz=True, row=self.msg_fuzz[self.ul_messages].msg_entry,
                                        new_val=self.msg_fuzz[self.ul_messages].new_val)
+
+                            print(FZ_PREFIX, "Changed SDU:")
+                            pdu.decode(decodeNAS=True, print_info=True, new_pdu=False)
 
                             pdu_send = pdu.encode()
                             print(FZ_PREFIX, "Sending encoded", pdu_send.hex())
                             self.socket.send(pdu_send)
 
-                    # If the fuzzing is enabled...
-                    elif self.fuzz_index is not None:
-                        # ... and this is the message to be fuzzed
-                        if self.ul_messages == self.fuzz_index.message:
-                            pdu.decode(decodeNAS=True, fuzz_index=self.fuzz_index)
+                    # If the fuzzing is enabled and this is the message to be fuzzed
+                    elif self.fuzz_index is not None and self.ul_messages == self.fuzz_index.message:
 
-                            pdu_send = pdu.encode()
-                            print(FZ_PREFIX, "Sending fuzzed", pdu_send.hex())
-                            self.socket.send(pdu_send)
+                        print(FZ_PREFIX, "Fuzz Index: message", self.fuzz_index.message, "field:", self.fuzz_index.field, "test index:",
+                              self.fuzz_index.test_input_index)
+                        pdu.decode(decodeNAS=True, fuzz_index=self.fuzz_index, print_info=True)
+
+                        print(FZ_PREFIX, "Changed SDU:")
+                        pdu.decode(decodeNAS=True, print_info=True, new_pdu=False)
+
+
+                        pdu_send = pdu.encode()
+                        print(FZ_PREFIX, "Sending fuzzed", pdu_send.hex())
+                        self.socket.send(pdu_send)
 
                     # If message has only to be decoded
                     else:
-                        pdu.decode(decodeNAS=True)
+                        pdu.decode(decodeNAS=True, print_info=False)
 
                         print(FZ_PREFIX, "Sending original", pdu.pdu.hex())
                         self.socket.send(pdu.pdu)
@@ -163,7 +172,7 @@ class Ue_Run:
                     pdu = Pdu(message[1:], False, self.dl_messages)
                     print(FZ_PREFIX, "[ DL Message", self.dl_messages, "received PDU", message[1:].hex(), "]\n")
 
-                    pdu.decode(decodeNAS=True)
+                    pdu.decode(decodeNAS=True, print_info=False)
                     # Useless to send a message
                     self.socket.send(b'\x12')
 

@@ -41,20 +41,26 @@ class Pdu:
             self.msg_type = RRCLTE.EUTRA_RRC_Definitions.DL_DCCH_Message
 
     # fuzz indicates if a field has to be changed, fuzz_index means there's a fuzzing procedure (test all fields)
-    def decode(self, decodeNAS=False, fuzz=False, row=0, new_val=0, fuzz_index=None):
+    def decode(self, print_info=True, decodeNAS=False, fuzz=False, row=0, new_val=0, fuzz_index=None, new_pdu=True):
         self.msg_type.from_uper(self.pdu)
-        self.pdu_dict = self.msg_type()
+        if new_pdu:
+            self.pdu_dict = self.msg_type()
+
+        self.decoded_msg = ""
+        self.counter = 0
         self.nas = []
+        self.nas_json = []
         # TODO: reimposta il Correct_test e Correct_ws_test a True e metti delf.debug_extra sotto print(self.decoded_mesg) e vedi se fallisce con il Radio link failure
         self.debug_extra()
 
-        self.parse_dict(0, 0, self.nas, initial_dict=self.pdu_dict, print_info=True, fuzz=fuzz, row=row, content=new_val, fuzz_index=fuzz_index)
-        self.decoded_msg += '\n'
-        print(self.decoded_msg)
+        self.parse_dict(0, 0, self.nas, initial_dict=self.pdu_dict, print_info=print_info, fuzz=fuzz, row=row, content=new_val, fuzz_index=fuzz_index)
+        if print_info:
+            self.decoded_msg += '\n'
+            print(self.decoded_msg)
 
 
         if fuzz_index is not None:
-            if not fuzz_index.has_next_input and self.counter >= fuzz_index.field + 1:
+            if not fuzz_index.has_next_input and self.counter <= fuzz_index.field + 1:
                 fuzz_index.has_next_field = False
 
         if len(self.nas) != 0:
@@ -64,7 +70,7 @@ class Pdu:
             print("No NAS messages")
         if self.has_nas and decodeNAS:
             for e in self.nas:
-                self.decode_nas(e, self.is_sdu)
+                self.decode_nas(e, self.is_sdu, print_info=False)
 
     def encode(self, asHexString=False):
         try:
@@ -82,9 +88,9 @@ class Pdu:
                 return self.pdu
 
     # Utilities
-    def parse_dict(self, container, container_key, nas_info_list, index=0, initial_dict={}, print_info=True, fuzz=False, row=0, content=0, fuzz_index=None):
-        # type: (Pdu, object, object, list, int, dict, bool, bool, int, object) -> object
-        if initial_dict == {}:
+    def parse_dict(self, container, container_key, nas_info_list, index=0, initial_dict=None, print_info=True, fuzz=False, row=0, content=0, fuzz_index=None):
+        # type: (Pdu, object, object, list, int, dict, bool, bool, int, object, object) -> object
+        if initial_dict is None:
             initial_dict = container[container_key]
         for key in initial_dict:
             if print_info:
@@ -102,7 +108,7 @@ class Pdu:
         return
 
     def parse_tuple(self, container, container_key, nas_info_list, index=0, print_info=True, fuzz=False, row=0, content=0, fuzz_index=None):
-        # type: (object, object, list, int, bool,  bool, int, object, object) -> object
+        # type: (Pdu, object, object, list, int, bool,  bool, int, object, object) -> object
 
         # Necessary conversion to enable modification to the tuple
         container[container_key] = list(container[container_key])
@@ -117,7 +123,7 @@ class Pdu:
         return
 
 
-    def recursor(self, container, container_key, nas_info_list, index, print_info=True, fuzz=False, row=0, content=0, fuzz_index=None):
+    def recursor(self, container, container_key, nas_info_list, index, print_info=True, fuzz=False, row=0, content=None, fuzz_index=None):
         if print_info:
             elem_type = str.upper(type(container[container_key]).__name__)
             # print(elem_type, end=' ')
@@ -168,7 +174,7 @@ class Pdu:
 
         return
 
-    def decode_nas(self, data, is_uplink, recursive=True):
+    def decode_nas(self, data, is_uplink, recursive=True, print_info=True):
         pdu = data
         m = 0
         e = 0
@@ -182,10 +188,10 @@ class Pdu:
             t = m.to_json() + "\n"
             self.nas_json.append(t)
 
-            if DEBUG_NAS_PRINT:
+            if print_info:
                 print("[DEBUG] Json NAS:", str.upper(type(t).__name__), t.replace("\n", "\n\t") + "\n")
             if recursive:
-                self.parse_nas(t, is_uplink)
+                self.parse_nas(t, is_uplink, print_info=print_info)
             if CORRECT_NAS_TEST:
                 assert (e == 0)
                 m.reautomate()
@@ -203,14 +209,14 @@ class Pdu:
 
 
 
-    def parse_nas(self, t, is_uplink):
+    def parse_nas(self, t, is_uplink, print_info=True):
         j = json.loads(t)
         keys = list(j.keys())
         for e in j[keys[0]]:
             inner_keys = list(e.keys())
             if inner_keys == ["NASMessage"]:
                 print("\nInner NAS Message:")
-                self.decode_nas(unhexlify(e["NASMessage"]), is_uplink, False)
+                self.decode_nas(unhexlify(e["NASMessage"]), is_uplink, False, print_info=print_info)
         if CORRECT_NAS_TEST:
             assert (keys == ["EMMSecProtNASMessage"] or
                     keys == ["EMMIdentityRequest"] or

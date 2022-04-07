@@ -28,9 +28,9 @@ def run():
     f = open("report", "a")
     f.write("\n" + "-" * 15 + " Run started at " + str(datetime.datetime.now().date()) + " " + str(datetime.datetime.now().time())[:8] + " " + "-" * 15 + "\n")
 
-    send_specific_message(f)
+    #send_specific_message(f)
 
-    #fuzz(f)
+    fuzz(f)
 
     f.close()
 
@@ -44,7 +44,7 @@ def send_specific_message(f):
     # Dict Format {UL_Message_Number: Msg_Fuzz(UL_Message_Number, other fields)
     # msg_fuzz = {0: Msg_Fuzz(0, msg_val=b'\x10')} # (Trigger RADIO LINK FAILURE)
     # msg_fuzz = {0: Msg_Fuzz(0, msg_entry=5, new_val=5)}
-    msg_fuzz = {1: Msg_Fuzz(1, msg_entry=5, new_val=b'\x12\x34')}  # Test Tuple ( CRASH CORE NETWORK )
+    # msg_fuzz = {1: Msg_Fuzz(1, msg_entry=5, new_val=b'\x12\x34')}  # Test Tuple ( CRASH CORE NETWORK )
 
     outcome = {}
 
@@ -84,7 +84,7 @@ def fuzz(f):
 
         outcome = {}
 
-        ue_run = Ue_Run(imsi, outcome)
+        ue_run = Ue_Run(imsi, outcome, fuzz_index=index)
         ue_run.run()
 
         print(outcome)
@@ -94,8 +94,9 @@ def fuzz(f):
 
         if OUTCOME_SUCC in outcome:
             if not outcome[OUTCOME_SUCC]:
-                f.write("message: " + index.message + ", field: " + index.field +
-                        ", test_index: " + index.test_input_index, + " " + str(outcome) + "\n")
+                f.write("message: " + str(index.message) + ", field: " + str(index.field) +
+                        ", test_index: " + str(index.test_input_index) + " " + str(outcome) + "\n")
+                f.flush()
         else:
             f.write("This run sent non registered Exception")
 

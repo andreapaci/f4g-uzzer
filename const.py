@@ -69,7 +69,7 @@ DEF_UE_FAIL_TIME = 10
 
 # Print human-readable PDUs debug information (eg. Json format)
 DEBUG_PDU_PRINT = False
-# Print human-readable NAS Messages
+# Print human-readable NAS Messages (not used anymore)
 DEBUG_NAS_PRINT = True
 
 # Note: if fuzzing is enabled, leave both test to False or else it will raise an error
