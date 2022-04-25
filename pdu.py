@@ -41,7 +41,7 @@ class Pdu:
             self.msg_type = RRCLTE.EUTRA_RRC_Definitions.DL_DCCH_Message
 
     # fuzz indicates if a field has to be changed, fuzz_index means there's a fuzzing procedure (test all fields)
-    def decode(self, print_info=True, decodeNAS=False, fuzz=False, row=0, new_val=0, fuzz_index=None, new_pdu=True):
+    def decode(self, print_info=True, decodeNAS=True, fuzz=False, row=0, new_val=0, fuzz_index=None, new_pdu=True):
         self.msg_type.from_uper(self.pdu)
         if new_pdu:
             self.pdu_dict = self.msg_type()
@@ -70,7 +70,7 @@ class Pdu:
             print("No NAS messages")
         if self.has_nas and decodeNAS:
             for e in self.nas:
-                self.decode_nas(e, self.is_sdu, print_info=False)
+                self.decode_nas(e, self.is_sdu, print_info=True)
 
     def encode(self, asHexString=False):
         try:

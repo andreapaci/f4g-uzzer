@@ -159,7 +159,7 @@ class Ue_Run:
 
                     # If message has only to be decoded
                     else:
-                        pdu.decode(decodeNAS=True, print_info=False)
+                        pdu.decode(decodeNAS=True, print_info=True)
 
                         print(FZ_PREFIX, "Sending original", pdu.pdu.hex())
                         self.socket.send(pdu.pdu)
@@ -172,7 +172,7 @@ class Ue_Run:
                     pdu = Pdu(message[1:], False, self.dl_messages)
                     print(FZ_PREFIX, "[ DL Message", self.dl_messages, "received PDU", message[1:].hex(), "]\n")
 
-                    pdu.decode(decodeNAS=True, print_info=False)
+                    pdu.decode(decodeNAS=True, print_info=True)
                     # Useless to send a message
                     self.socket.send(b'\x12')
 
