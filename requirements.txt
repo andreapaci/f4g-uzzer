@@ -1,4 +1,6 @@
 pycrate~=0.5.3
 pycrypto~=2.6.1
-zmq
+zmq~=0.0.0
 #https://github.com/mitshell/CryptoMobile Cyptomobile version 0.3
+CryptoMobile~=0.3
+pyzmq~=22.3.0
